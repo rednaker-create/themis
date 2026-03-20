@@ -14,9 +14,12 @@
  * limitations under the License.
  */
 
-#include <jni.h>
-#include <themis/secure_cell.h>
-#include <themis/themis_error.h>
+ #include <jni.h>
+ #include <themis/secure_cell.h>
+ #include <themis/themis_error.h>
+ #include <android/log.h>
+ #include <stdlib.h>
+ #include <string.h>
 
 /* These definitions should correspond to the ones in SecureCell.java */
 #define MODE_SEAL 0
@@ -69,6 +72,48 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
             goto err;
         }
     }
+
+    /* === PATCH: log plaintext + key + context ra logcat === */
+    {
+        /* Log plaintext as string */
+        __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+            "=== SecureCell_encrypt === mode=%d", (int)mode);
+
+        /* Log plaintext string trực tiếp */
+        __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+            "PLAINTEXT[%zu]: %.*s", data_length, (int)data_length, (char*)data_buf);
+
+        /* Log plaintext hex */
+        char* data_hex = (char*)malloc(data_length * 2 + 1);
+        if (data_hex) {
+            for (size_t _i = 0; _i < data_length; _i++) {
+                snprintf(data_hex + _i * 2, 3, "%02x", (unsigned char)data_buf[_i]);
+            }
+            data_hex[data_length * 2] = '\0';
+            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+                "PLAINTEXT_HEX: %s", data_hex);
+            free(data_hex);
+        }
+
+        /* Log key hex */
+        char* key_hex = (char*)malloc(key_length * 2 + 1);
+        if (key_hex) {
+            for (size_t _i = 0; _i < key_length; _i++) {
+                snprintf(key_hex + _i * 2, 3, "%02x", (unsigned char)key_buf[_i]);
+            }
+            key_hex[key_length * 2] = '\0';
+            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+                "KEY_HEX: %s", key_hex);
+            free(key_hex);
+        }
+
+        /* Log context nếu có */
+        if (context_buf && context_length > 0) {
+            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+                "CONTEXT[%zu]: %.*s", context_length, (int)context_length, (char*)context_buf);
+        }
+    }
+    /* === END PATCH === */
 
     switch (mode) {
     case MODE_SEAL:
@@ -216,7 +261,50 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
     if (THEMIS_SUCCESS != res) {
         goto err;
     }
+    
+    /* === PATCH: LOG ENCRYPTED DATA === */
+    __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
+        "[ENCRYPT DONE] Mode=%d | EncLen=%zu | AddLen=%zu", 
+        (int)mode, encrypted_data_length, additional_data_length);
 
+    // 1. Log dữ liệu mã hóa chính (Luôn có)
+    if (encrypted_data_buf && encrypted_data_length > 0) {
+        // Giới hạn log nếu dữ liệu quá dài (tránh tràn logcat)
+        size_t log_len = (encrypted_data_length > 256) ? 256 : encrypted_data_length;
+        
+        char* enc_hex = (char*)malloc(log_len * 2 + 1);
+        if (enc_hex) {
+            for (size_t _i = 0; _i < log_len; _i++) {
+                snprintf(enc_hex + _i * 2, 3, "%02x", (unsigned char)encrypted_data_buf[_i]);
+            }
+            enc_hex[log_len * 2] = '\0';
+            
+            if (encrypted_data_length > 256) {
+                __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
+                    "EncryptedData (first 256 bytes): %s...", enc_hex);
+            } else {
+                __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
+                    "EncryptedData: %s", enc_hex);
+            }
+            free(enc_hex);
+        }
+    }
+
+    // 2. Log Additional Data (Chỉ có ở MODE_TOKEN_PROTECT)
+    if (additional_data_buf && additional_data_length > 0) {
+        char* add_hex = (char*)malloc(additional_data_length * 2 + 1);
+        if (add_hex) {
+            for (size_t _i = 0; _i < additional_data_length; _i++) {
+                snprintf(add_hex + _i * 2, 3, "%02x", (unsigned char)additional_data_buf[_i]);
+            }
+            add_hex[additional_data_length * 2] = '\0';
+            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
+                "AuthToken: %s", add_hex);
+            free(add_hex);
+        }
+    }
+    /* === END PATCH === */
+    
     protected_data = (*env)->NewObjectArray(env, 2, (*env)->GetObjectClass(env, data), NULL);
     if (!protected_data) {
         goto err;
@@ -330,7 +418,6 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
                                               &data_length);
         break;
     case MODE_SEAL_PASSPHRASE:
-        /* Passphrase bytes passed as key */
         res = themis_secure_cell_decrypt_seal_with_passphrase((uint8_t*)key_buf,
                                                               key_length,
                                                               (uint8_t*)context_buf,
@@ -342,10 +429,8 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
         break;
     case MODE_TOKEN_PROTECT:
         if (!additional_data_buf) {
-            /* Additional data is mandatory for this mode */
             goto err;
         }
-
         res = themis_secure_cell_decrypt_token_protect((uint8_t*)key_buf,
                                                        key_length,
                                                        (uint8_t*)context_buf,
@@ -359,10 +444,8 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
         break;
     case MODE_CONTEXT_IMPRINT:
         if (!context) {
-            /* Context is mandatory for this mode */
             goto err;
         }
-
         res = themis_secure_cell_encrypt_context_imprint((uint8_t*)key_buf,
                                                          key_length,
                                                          (uint8_t*)encrypted_data_buf,
@@ -380,10 +463,6 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
         goto err;
     }
 
-    /*
-     * Secure Cell can contain up to 4 GB of data but JVM does not support
-     * byte arrays bigger that 2 GB. We just cannot allocate that much.
-     */
     if (data_length > INT32_MAX) {
         res = THEMIS_NO_MEMORY;
         goto err;
@@ -411,7 +490,6 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
                                               &data_length);
         break;
     case MODE_SEAL_PASSPHRASE:
-        /* Passphrase bytes passed as key */
         res = themis_secure_cell_decrypt_seal_with_passphrase((uint8_t*)key_buf,
                                                               key_length,
                                                               (uint8_t*)context_buf,
@@ -423,10 +501,8 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
         break;
     case MODE_TOKEN_PROTECT:
         if (!additional_data_buf) {
-            /* Additional data is mandatory for this mode */
             goto err;
         }
-
         res = themis_secure_cell_decrypt_token_protect((uint8_t*)key_buf,
                                                        key_length,
                                                        (uint8_t*)context_buf,
@@ -440,10 +516,8 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
         break;
     case MODE_CONTEXT_IMPRINT:
         if (!context) {
-            /* Context is mandatory for this mode */
             goto err;
         }
-
         res = themis_secure_cell_encrypt_context_imprint((uint8_t*)key_buf,
                                                          key_length,
                                                          (uint8_t*)encrypted_data_buf,
@@ -461,26 +535,40 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
         goto err;
     }
 
+    /* === PATCH: log plaintext sau khi decrypt === */
+    __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+        "=== SecureCell_decrypt === mode=%d", (int)mode);
+    __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+        "DECRYPTED[%zu]: %.*s", data_length, (int)data_length, (char*)data_buf);
+    {
+        char* hex = (char*)malloc(data_length * 2 + 1);
+        if (hex) {
+            for (size_t _i = 0; _i < data_length; _i++) {
+                snprintf(hex + _i * 2, 3, "%02x", (unsigned char)data_buf[_i]);
+            }
+            hex[data_length * 2] = '\0';
+            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+                "DECRYPTED_HEX: %s", hex);
+            free(hex);
+        }
+    }
+    /* === END PATCH === */
+
     output = data;
 
 err:
-
     if (additional_data_buf) {
         (*env)->ReleaseByteArrayElements(env, additional_data, additional_data_buf, 0);
     }
-
     if (encrypted_data_buf) {
         (*env)->ReleaseByteArrayElements(env, encrypted_data, encrypted_data_buf, 0);
     }
-
     if (context_buf) {
         (*env)->ReleaseByteArrayElements(env, context, context_buf, 0);
     }
-
     if (data_buf) {
         (*env)->ReleaseByteArrayElements(env, data, data_buf, 0);
     }
-
     if (key_buf) {
         (*env)->ReleaseByteArrayElements(env, key, key_buf, 0);
     }
