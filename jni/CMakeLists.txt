@@ -63,4 +63,4 @@ target_include_directories(themis_jni
         ../src
         ../third_party/boringssl/src/include
 )
-target_link_libraries(themis_jni PRIVATE themis soter crypto decrepit)
+target_link_libraries(themis_jni PRIVATE themis soter crypto decrepit log)
