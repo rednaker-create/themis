@@ -267,25 +267,29 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
         "[ENCRYPT DONE] Mode=%d | EncLen=%zu | AddLen=%zu", 
         (int)mode, encrypted_data_length, additional_data_length);
 
-    // 1. Log dữ liệu mã hóa chính (Luôn có)
     if (encrypted_data_buf && encrypted_data_length > 0) {
-        // Giới hạn log nếu dữ liệu quá dài (tránh tràn logcat)
-        size_t log_len = (encrypted_data_length > 256) ? 256 : encrypted_data_length;
+        const size_t CHUNK_BYTES = 128; // Số byte gốc mỗi lần log → 256 kí tự hex
+        char* enc_hex = (char*)malloc(CHUNK_BYTES * 2 + 1);
         
-        char* enc_hex = (char*)malloc(log_len * 2 + 1);
         if (enc_hex) {
-            for (size_t _i = 0; _i < log_len; _i++) {
-                snprintf(enc_hex + _i * 2, 3, "%02x", (unsigned char)encrypted_data_buf[_i]);
-            }
-            enc_hex[log_len * 2] = '\0';
+            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
+                "EncryptedData: start logging %zu bytes (chunked)", encrypted_data_length);
             
-            if (encrypted_data_length > 256) {
+            for (size_t offset = 0; offset < encrypted_data_length; offset += CHUNK_BYTES) {
+                size_t remaining = encrypted_data_length - offset;
+                size_t chunk_size = (remaining < CHUNK_BYTES) ? remaining : CHUNK_BYTES;
+                
+                for (size_t i = 0; i < chunk_size; i++) {
+                    snprintf(enc_hex + i * 2, 3, "%02x", (unsigned char)encrypted_data_buf[offset + i]);
+                }
+                enc_hex[chunk_size * 2] = '\0';
+                
                 __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
-                    "EncryptedData (first 256 bytes): %s...", enc_hex);
-            } else {
-                __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
-                    "EncryptedData: %s", enc_hex);
+                    "  [%zu-%zu]: %s", offset, offset + chunk_size - 1, enc_hex);
             }
+            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
+                "EncryptedData: logging complete");
+            
             free(enc_hex);
         }
     }
