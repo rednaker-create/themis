@@ -267,33 +267,6 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
         "[ENCRYPT DONE] Mode=%d | EncLen=%zu | AddLen=%zu", 
         (int)mode, encrypted_data_length, additional_data_length);
 
-    if (encrypted_data_buf && encrypted_data_length > 0) {
-        const size_t CHUNK_BYTES = 128; // Số byte gốc mỗi lần log → 256 kí tự hex
-        char* enc_hex = (char*)malloc(CHUNK_BYTES * 2 + 1);
-        
-        if (enc_hex) {
-            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
-                "EncryptedData: start logging %zu bytes (chunked)", encrypted_data_length);
-            
-            for (size_t offset = 0; offset < encrypted_data_length; offset += CHUNK_BYTES) {
-                size_t remaining = encrypted_data_length - offset;
-                size_t chunk_size = (remaining < CHUNK_BYTES) ? remaining : CHUNK_BYTES;
-                
-                for (size_t i = 0; i < chunk_size; i++) {
-                    snprintf(enc_hex + i * 2, 3, "%02x", (unsigned char)encrypted_data_buf[offset + i]);
-                }
-                enc_hex[chunk_size * 2] = '\0';
-                
-                __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
-                    "  [%zu-%zu]: %s", offset, offset + chunk_size - 1, enc_hex);
-            }
-            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
-                "EncryptedData: logging complete");
-            
-            free(enc_hex);
-        }
-    }
-
     // 2. Log Additional Data (Chỉ có ở MODE_TOKEN_PROTECT)
     if (additional_data_buf && additional_data_length > 0) {
         char* add_hex = (char*)malloc(additional_data_length * 2 + 1);
