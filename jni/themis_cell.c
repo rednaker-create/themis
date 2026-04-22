@@ -76,11 +76,11 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
     /* === PATCH: log plaintext + key + context ra logcat === */
     {
         /* Log plaintext as string */
-        __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+        __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED",
             "=== SecureCell_encrypt === mode=%d", (int)mode);
 
         /* Log plaintext string trực tiếp */
-        __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+        __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED",
             "PLAINTEXT[%zu]: %.*s", data_length, (int)data_length, (char*)data_buf);
 
         /* Log plaintext hex */
@@ -90,7 +90,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
                 snprintf(data_hex + _i * 2, 3, "%02x", (unsigned char)data_buf[_i]);
             }
             data_hex[data_length * 2] = '\0';
-            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+            __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED",
                 "PLAINTEXT_HEX: %s", data_hex);
             free(data_hex);
         }
@@ -102,14 +102,14 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
                 snprintf(key_hex + _i * 2, 3, "%02x", (unsigned char)key_buf[_i]);
             }
             key_hex[key_length * 2] = '\0';
-            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+            __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED",
                 "KEY_HEX: %s", key_hex);
             free(key_hex);
         }
 
         /* Log context nếu có */
         if (context_buf && context_length > 0) {
-            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+            __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED",
                 "CONTEXT[%zu]: %.*s", context_length, (int)context_length, (char*)context_buf);
         }
     }
@@ -263,7 +263,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
     }
     
     /* === PATCH: LOG ENCRYPTED DATA === */
-    __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
+    __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED", 
         "[ENCRYPT DONE] Mode=%d | EncLen=%zu | AddLen=%zu", 
         (int)mode, encrypted_data_length, additional_data_length);
 
@@ -275,7 +275,7 @@ JNIEXPORT jobjectArray JNICALL Java_com_cossacklabs_themis_SecureCell_encrypt(
                 snprintf(add_hex + _i * 2, 3, "%02x", (unsigned char)additional_data_buf[_i]);
             }
             add_hex[additional_data_length * 2] = '\0';
-            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH", 
+            __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED", 
                 "AuthToken: %s", add_hex);
             free(add_hex);
         }
@@ -513,9 +513,9 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
     }
 
     /* === PATCH: log plaintext sau khi decrypt === */
-    __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+    __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED",
         "=== SecureCell_decrypt === mode=%d", (int)mode);
-    __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+    __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED",
         "DECRYPTED[%zu]: %.*s", data_length, (int)data_length, (char*)data_buf);
     {
         char* hex = (char*)malloc(data_length * 2 + 1);
@@ -524,7 +524,7 @@ JNIEXPORT jbyteArray JNICALL Java_com_cossacklabs_themis_SecureCell_decrypt(
                 snprintf(hex + _i * 2, 3, "%02x", (unsigned char)data_buf[_i]);
             }
             hex[data_length * 2] = '\0';
-            __android_log_print(ANDROID_LOG_ERROR, "THEMIS_PATCH",
+            __android_log_print(ANDROID_LOG_ERROR, "DYNAMICKEY_CRACKED",
                 "DECRYPTED_HEX: %s", hex);
             free(hex);
         }
